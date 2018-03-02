@@ -19,6 +19,9 @@
 #endif /* HAVE_STDBOOL_H */
 #include <stdio.h>
 
+/* libopendmarc */
+#include <dmarc.h>
+
 #ifdef __STDC__
 # ifndef __P
 #  define __P(x)  x
@@ -34,6 +37,7 @@
 #define	CONFIG_TYPE_INTEGER	1
 #define	CONFIG_TYPE_BOOLEAN	2
 #define	CONFIG_TYPE_INCLUDE	3
+#define	CONFIG_TYPE_VDMARC_MODE	4
 
 struct config
 {
@@ -42,6 +46,7 @@ struct config
 	int		cfg_int;
 	char *		cfg_name;
 	char *		cfg_string;
+	OPENDMARC_VDMARC_VERIFICATION_MODE_T	cfg_vdmarc_mode;
 	struct config *	cfg_next;
 };
 

@@ -22,6 +22,10 @@
 # include <opendmarc_strl.h>
 #endif /* USE_DMARCSTRL_H */
 
+/* virtual dmarc record */
+#define DMARC_DEFAULT_BESTGUESSPASS_RECORD_WITH_STRICT_MODE "v=DMARC1; adkim=s; aspf=s; p=none"
+#define DMARC_DEFAULT_BESTGUESSPASS_RECORD_WITH_RELAX_MODE "v=DMARC1; adkim=r; aspf=r; p=none"
+
 /**************************************************************************
 ** OPENDMARC_POLICY_LIBRARY_INIT -- Initialize The Library
 **	Parameters:
@@ -277,11 +281,11 @@ opendmarc_policy_check_alignment(u_char *subdomain, u_char *tld, int mode)
 
 	ret = strncasecmp(rev_tld, rev_sub, strlen(rev_tld));
 	if (ret == 0 && mode == DMARC_RECORD_A_RELAXED)
-			return 0;
+		return 0;
 
-        ret = strncasecmp(rev_sub, rev_tld, strlen(rev_sub));
-        if (ret == 0 && mode == DMARC_RECORD_A_RELAXED)
-                        return 0;
+	ret = strncasecmp(rev_sub, rev_tld, strlen(rev_sub));
+	if (ret == 0 && mode == DMARC_RECORD_A_RELAXED)
+		return 0;
 
 	ret = opendmarc_get_tld(tld, tld_buf, sizeof tld_buf);
 	if (ret != 0)
@@ -669,8 +673,9 @@ opendmarc_policy_query_dmarc_xdomain(DMARC_POLICY_T *pctx, u_char *uri)
 **					specified domain. If not found
 **				  	try the organizational domain.
 **	Parameters:
-**		pctx	-- The context to uptdate
-**		domain 	-- The domain for which to lookup the DMARC record
+**		pctx	    -- The context to uptdate
+**		domain	    -- The domain for which to lookup the DMARC record
+**		vdmarc_mode -- The vDMARC verification mode
 **	Returns:
 **		DMARC_PARSE_OKAY		-- On success, and fills pctx
 **		DMARC_PARSE_ERROR_NULL_CTX	-- If pctx was NULL
@@ -691,10 +696,10 @@ opendmarc_policy_query_dmarc_xdomain(DMARC_POLICY_T *pctx, u_char *uri)
 **	Warning:
 **		If no TLD file has been loaded, will silenty not do that
 **		fallback lookup.
-** 
+**
 ***************************************************************************/
 OPENDMARC_STATUS_T
-opendmarc_policy_query_dmarc(DMARC_POLICY_T *pctx, u_char *domain)
+opendmarc_policy_query_dmarc(DMARC_POLICY_T *pctx, u_char *domain, OPENDMARC_VDMARC_VERIFICATION_MODE_T vdmarc_mode)
 {
 	u_char 		buf[BUFSIZ];
 	u_char 		copy[256];
@@ -769,7 +774,20 @@ dns_failed:
 		case HOST_NOT_FOUND:
 		case NO_DATA:
 		case NO_RECOVERY:
-			return DMARC_DNS_ERROR_NO_RECORD;
+			switch (vdmarc_mode)
+			{
+				case OPENDMARC_VDMARC_VERIFICATION_MODE_STRICT:
+					pctx->verified_virtually = TRUE;
+					return opendmarc_policy_parse_dmarc(pctx, domain, DMARC_DEFAULT_BESTGUESSPASS_RECORD_WITH_STRICT_MODE);
+
+				case OPENDMARC_VDMARC_VERIFICATION_MODE_RELAX:
+					pctx->verified_virtually = TRUE;
+					return opendmarc_policy_parse_dmarc(pctx, domain, DMARC_DEFAULT_BESTGUESSPASS_RECORD_WITH_RELAX_MODE);
+
+				case OPENDMARC_VDMARC_VERIFICATION_MODE_NONE:
+					return DMARC_DNS_ERROR_NO_RECORD;
+			}
+
 		case TRY_AGAIN:
 		case NETDB_INTERNAL:
 			return DMARC_DNS_ERROR_TMPERR;
@@ -785,7 +803,8 @@ got_record:
 ** OPENDMARC_GET_POLICY_TO_ENFORCE -- What to do with this message. i.e. allow
 **				possible delivery, quarantine, or reject.
 **	Parameters:
-**		pctx	-- A Policy context
+**		pctx	    -- A Policy context
+**		vdmarc_mode -- The vDMARC verification mode
 **	Returns:
 **		DMARC_PARSE_ERROR_NULL_CTX	-- pctx == NULL
 **		DMARC_POLICY_ABSENT		-- No DMARC record found
@@ -798,7 +817,7 @@ got_record:
 **		Checks for domain alignment.
 ***************************************************************************/
 OPENDMARC_STATUS_T
-opendmarc_get_policy_to_enforce(DMARC_POLICY_T *pctx)
+opendmarc_get_policy_to_enforce(DMARC_POLICY_T *pctx, OPENDMARC_VDMARC_VERIFICATION_MODE_T vdmarc_mode)
 {
 
 	if (pctx == NULL)
@@ -832,8 +851,11 @@ opendmarc_get_policy_to_enforce(DMARC_POLICY_T *pctx)
 	 * Accept the message.
 	 */
 	if (pctx->spf_alignment == DMARC_POLICY_SPF_ALIGNMENT_PASS ||
-	    pctx->dkim_alignment == DMARC_POLICY_DKIM_ALIGNMENT_PASS)
-		return DMARC_POLICY_PASS;
+	   pctx->dkim_alignment == DMARC_POLICY_DKIM_ALIGNMENT_PASS)
+	{
+		return pctx->verified_virtually && vdmarc_mode == OPENDMARC_VDMARC_VERIFICATION_MODE_RELAX ?
+		  DMARC_POLICY_BESTGUESSPASS : DMARC_POLICY_PASS;
+	}
 
 	if (pctx->organizational_domain != NULL)
 	{
@@ -846,7 +868,7 @@ opendmarc_get_policy_to_enforce(DMARC_POLICY_T *pctx)
 			return DMARC_POLICY_QUARANTINE;
 
 		  case DMARC_RECORD_P_NONE:
-			return DMARC_POLICY_NONE;
+			return pctx->verified_virtually ? DMARC_POLICY_NONE_WITH_VDMARC : DMARC_POLICY_NONE;
 		}
 	}
 
@@ -857,7 +879,7 @@ opendmarc_get_policy_to_enforce(DMARC_POLICY_T *pctx)
 		case DMARC_RECORD_P_QUARANTINE:
 			return DMARC_POLICY_QUARANTINE;
 		case DMARC_RECORD_P_NONE:
-			return DMARC_POLICY_NONE;
+			return pctx->verified_virtually ? DMARC_POLICY_NONE_WITH_VDMARC : DMARC_POLICY_NONE;
 		default:
 			/* XXX -- shouldn't be possible */
 			return DMARC_POLICY_PASS;
@@ -1602,6 +1624,12 @@ opendmarc_policy_status_to_str(OPENDMARC_STATUS_T status)
 		break;
 	    case DMARC_POLICY_NONE: 
 		msg = "Policy says to monitor and report";
+		break;
+	    case DMARC_POLICY_BESTGUESSPASS:
+		msg = "Policy OK by vDAMRC so accept message";
+		break;
+	    case DMARC_POLICY_NONE_WITH_VDMARC:
+		msg = "Policy says to monitor and report by vDMARC";
 		break;
 	}
 	return msg;

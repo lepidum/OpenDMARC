@@ -109,6 +109,11 @@ AC_CHECK_HEADERS([arpa/nameser.h], [], [],
 # include <sys/types.h>
 #endif
 ])
+AC_CHECK_HEADERS([arpa/nameser_compat.h], [], [],
+[#if HAVE_SYS_TYPES_H
+# include <sys/types.h>
+#endif
+])
 AC_CHECK_HEADERS([resolv.h], [], [],
 [#if HAVE_SYS_TYPES_H
 # include <sys/types.h>

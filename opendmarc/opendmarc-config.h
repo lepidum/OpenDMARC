@@ -52,6 +52,7 @@ struct configdef dmarcf_config[] =
 	{ "TrustedAuthservIDs",		CONFIG_TYPE_STRING,	FALSE },
 	{ "UMask",			CONFIG_TYPE_INTEGER,	FALSE },
 	{ "Userid",			CONFIG_TYPE_STRING,	FALSE },
+	{ "VdmarcVerification",		CONFIG_TYPE_VDMARC_MODE,	FALSE },
 	{ NULL,				(u_int) -1,		FALSE }
 };
 

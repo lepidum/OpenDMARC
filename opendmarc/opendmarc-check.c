@@ -116,7 +116,7 @@ main(int argc, char **argv)
 			return EX_SOFTWARE;
 		}
 
-		status = opendmarc_policy_query_dmarc(dmarc, NULL);
+		status = opendmarc_policy_query_dmarc(dmarc, NULL, OPENDMARC_VDMARC_VERIFICATION_MODE_NONE);
 		if (status != DMARC_PARSE_OKAY)
 		{
 			fprintf(stderr,

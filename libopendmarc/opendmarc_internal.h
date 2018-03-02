@@ -163,6 +163,7 @@ typedef struct dmarc_policy_t {
 	int		ruf_cnt;
 	u_char **	ruf_list;
 	int		fo;
+	_Bool		verified_virtually;
 } DMARC_POLICY_T;
 #ifndef OPENDMARC_POLICY_C
 # define OPENDMARC_POLICY_C 1

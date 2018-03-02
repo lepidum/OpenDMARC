@@ -364,3 +364,16 @@
 ##  the named userid unless an alternate group is specified.
 #
 # UserID opendmarc
+
+## VdmarcVerification { "relax" | "strict" | "none" }
+##      default "none"
+##
+## Sets virtual DMARC verification mode.  If "relax" or "strict" is
+## set here, the virtual DMARC mode is utilized when fetching the
+## DMARC policy record from DNS fails.  The virtual DMARC policy
+## record "v=DMARC1; adkim=r; aspf=r; p=none" will be used for the
+## "relax" mode, and "v=DMARC1; adkim=s; aspf=s; p=none" for the
+## "strict" mode, respectively.  If "none" is set here, it behaves as
+## a conventional DMARC.
+#
+# VdmarcVerification none

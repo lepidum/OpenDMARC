@@ -96,6 +96,9 @@
 				} \
 			} while (0)
 
+/* default vDMARC verification mode */
+#define DEFAULT_VDMARC_VERIFICATION_MODE OPENDMARC_VDMARC_VERIFICATION_MODE_NONE
+
 /* data types */
 /* DMARCF_HEADER -- a linked list of header fields */
 struct dmarcf_header
@@ -165,6 +168,7 @@ struct dmarcf_config
 	char *			conf_authservid;
 	char *			conf_historyfile;
 	char *			conf_pslist;
+	OPENDMARC_VDMARC_VERIFICATION_MODE_T	conf_vdmarc_verification;
 	char *			conf_ignorelist;
 	char **			conf_trustedauthservids;
 	char **			conf_ignoredomains;
@@ -1300,6 +1304,10 @@ dmarcf_config_load(struct config *data, struct dmarcf_config *conf,
 		(void) config_get(data, "PublicSuffixList",
 		                  &conf->conf_pslist,
 		                  sizeof conf->conf_pslist);
+
+		(void) config_get(data, "VdmarcVerification",
+		                  &conf->conf_vdmarc_verification,
+		                  sizeof conf->conf_vdmarc_verification);
 
 		if (!conf->conf_dolog)
 		{
@@ -2641,7 +2649,7 @@ mlfi_eom(SMFICTX *ctx)
 	}
 
 	ostatus = opendmarc_policy_query_dmarc(cc->cctx_dmarc,
-	                                       dfc->mctx_fromdomain);
+	                                       dfc->mctx_fromdomain, cc->cctx_config->conf_vdmarc_verification);
 	if (ostatus == DMARC_PARSE_ERROR_NULL_CTX ||
 	    ostatus == DMARC_PARSE_ERROR_EMPTY)
 	{
@@ -2690,7 +2698,7 @@ mlfi_eom(SMFICTX *ctx)
 	                                       pdomain, sizeof pdomain);
 	dmarcf_dstring_printf(dfc->mctx_histbuf, "pdomain %s\n", pdomain);
 
-	policy = opendmarc_get_policy_to_enforce(cc->cctx_dmarc);
+	policy = opendmarc_get_policy_to_enforce(cc->cctx_dmarc, cc->cctx_config->conf_vdmarc_verification);
 	if (ostatus == DMARC_DNS_ERROR_NO_RECORD)
 		policy = DMARC_POLICY_ABSENT;
 	dmarcf_dstring_printf(dfc->mctx_histbuf, "policy %d\n", policy);
@@ -2756,7 +2764,7 @@ mlfi_eom(SMFICTX *ctx)
 	ruv = opendmarc_policy_fetch_ruf(cc->cctx_dmarc, NULL, 0, TRUE);
 	if ((policy == DMARC_POLICY_REJECT ||
 	     policy == DMARC_POLICY_QUARANTINE ||
-	     (conf->conf_afrfnone && policy == DMARC_POLICY_NONE)) &&
+	     (conf->conf_afrfnone && (policy == DMARC_POLICY_NONE || policy == DMARC_POLICY_NONE_WITH_VDMARC))) &&
 	    conf->conf_afrf &&
 	    (conf->conf_afrfbcc != NULL || ruv != NULL))
 	{
@@ -3008,6 +3016,7 @@ mlfi_eom(SMFICTX *ctx)
 	{
 	  case DMARC_POLICY_ABSENT:		/* No DMARC record found */
 	  case DMARC_FROM_DOMAIN_ABSENT:	/* No From: domain */
+	  case DMARC_POLICY_NONE_WITH_VDMARC:   /* Alignment failed with virtual verify */
 		aresult = "none";
 		ret = SMFIS_ACCEPT;
 		result = DMARC_RESULT_ACCEPT;
@@ -3021,6 +3030,12 @@ mlfi_eom(SMFICTX *ctx)
 
 	  case DMARC_POLICY_PASS:		/* Explicit accept */
 		aresult = "pass";
+		ret = SMFIS_ACCEPT;
+		result = DMARC_RESULT_ACCEPT;
+		break;
+
+	  case DMARC_POLICY_BESTGUESSPASS:
+		aresult = "bestguesspass";
 		ret = SMFIS_ACCEPT;
 		result = DMARC_RESULT_ACCEPT;
 		break;
@@ -3517,6 +3532,7 @@ dmarcf_config_new(void)
 	memset(new, '\0', sizeof(struct dmarcf_config));
 
 	new->conf_reportcmd = DEFREPORTCMD;
+	new->conf_vdmarc_verification = DEFAULT_VDMARC_VERIFICATION_MODE;
 
 	return new;
 }

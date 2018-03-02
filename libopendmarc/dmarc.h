@@ -74,9 +74,10 @@ extern "C" {
 #define DMARC_POLICY_REJECT			(16)	/* Policy says to reject message */
 #define DMARC_POLICY_QUARANTINE			(17)	/* Policy says to quarantine message */
 #define DMARC_POLICY_NONE			(18)	/* Policy says to monitor and report */
-
-#define DMARC_USED_POLICY_IS_P			(19)	/* Domain policy taken (aka 'p')*/
-#define DMARC_USED_POLICY_IS_SP			(20)	/* Sub-domain policy taken (aka 'sp')*/
+#define DMARC_POLICY_BESTGUESSPASS		(19)
+#define DMARC_POLICY_NONE_WITH_VDMARC		(20)
+#define DMARC_USED_POLICY_IS_P			(21)	/* Domain policy taken (aka 'p')*/
+#define DMARC_USED_POLICY_IS_SP			(22)	/* Sub-domain policy taken (aka 'sp')*/
 
 #ifndef OPENDMARC_POLICY_C
  typedef struct dmarc_policy_t DMARC_POLICY_T;
@@ -97,6 +98,12 @@ typedef struct {
 	int    			nscount;
 	struct sockaddr_in 	nsaddr_list[MAXNS];
 } OPENDMARC_LIB_T;
+
+typedef enum {
+	OPENDMARC_VDMARC_VERIFICATION_MODE_STRICT,
+	OPENDMARC_VDMARC_VERIFICATION_MODE_RELAX,
+	OPENDMARC_VDMARC_VERIFICATION_MODE_NONE
+} OPENDMARC_VDMARC_VERIFICATION_MODE_T;
 
 #define OPENDMARC_TLD_TYPE_NONE    (0)	/* Will not use a tld file             */
 #define OPENDMARC_TLD_TYPE_MOZILLA (1)	/* mozilla.org effective_tld_names.dat */
@@ -125,14 +132,14 @@ OPENDMARC_STATUS_T opendmarc_policy_store_spf(DMARC_POLICY_T *pctx, u_char *doma
 /*
  * The DMARC record itself.
  */
-OPENDMARC_STATUS_T opendmarc_policy_query_dmarc(DMARC_POLICY_T *pctx, u_char *domain);
+OPENDMARC_STATUS_T opendmarc_policy_query_dmarc(DMARC_POLICY_T *pctx, u_char *domain, OPENDMARC_VDMARC_VERIFICATION_MODE_T vdmarc_mode);
 OPENDMARC_STATUS_T opendmarc_policy_parse_dmarc(DMARC_POLICY_T *pctx, u_char *domain, u_char *record);
 OPENDMARC_STATUS_T opendmarc_policy_store_dmarc(DMARC_POLICY_T *pctx, u_char *dmarc_record, u_char *domain, u_char *organizationaldomain);
 
 /*
  * Access to parts of the DMARC record.
  */
-OPENDMARC_STATUS_T opendmarc_get_policy_to_enforce(DMARC_POLICY_T *pctx);
+OPENDMARC_STATUS_T opendmarc_get_policy_to_enforce(DMARC_POLICY_T *pctx, OPENDMARC_VDMARC_VERIFICATION_MODE_T vdmarc_mode);
 OPENDMARC_STATUS_T opendmarc_policy_fetch_alignment(DMARC_POLICY_T *pctx, int *dkim_alignment, int *spf_alignment);
 OPENDMARC_STATUS_T opendmarc_policy_fetch_pct(DMARC_POLICY_T *pctx, int *pctp);
 OPENDMARC_STATUS_T opendmarc_policy_fetch_adkim(DMARC_POLICY_T *pctx, int *adkim);

@@ -48,6 +48,11 @@
 # define TRUE		1
 #endif /* ! TRUE */
 
+/* vDMARC verifiction mode strings */
+#define	VDMARC_VERIFICATION_MODE_STRICT_STRING	"strict"
+#define	VDMARC_VERIFICATION_MODE_RELAX_STRING	"relax"
+#define	VDMARC_VERIFICATION_MODE_NONE_STRING	"none"
+
 /* prototypes */
 static void config_attach __P((struct config *, struct config **));
 
@@ -267,6 +272,27 @@ config_load_level(char *file, struct configdef *def,
 
 					break;
 
+				case CONFIG_TYPE_VDMARC_MODE:
+					if (strcasecmp(p, VDMARC_VERIFICATION_MODE_STRICT_STRING) == 0)
+					{
+						value = OPENDMARC_VDMARC_VERIFICATION_MODE_STRICT;
+					}
+					else if (strcasecmp(p, VDMARC_VERIFICATION_MODE_RELAX_STRING) == 0)
+					{
+						value = OPENDMARC_VDMARC_VERIFICATION_MODE_RELAX;
+					}
+					else if (strcasecmp(p, VDMARC_VERIFICATION_MODE_NONE_STRING) == 0)
+					{
+						value = OPENDMARC_VDMARC_VERIFICATION_MODE_NONE;
+					}
+					else
+					{
+						conf_error = CONF_ILLEGAL;
+						err = 1;
+					}
+
+					break;
+
 				  default:
 					assert(0);
 					/* NOTREACHED */
@@ -354,6 +380,10 @@ config_load_level(char *file, struct configdef *def,
 			new->cfg_int = value;
 			break;
 
+		  case CONFIG_TYPE_VDMARC_MODE:
+			new->cfg_vdmarc_mode = value;
+			break;
+
 		  default:
 			assert(0);
 		}
@@ -377,6 +407,7 @@ config_load_level(char *file, struct configdef *def,
 			cur->cfg_name = "";
 			cur->cfg_string = NULL;
 			cur->cfg_next = NULL;
+			cur->cfg_vdmarc_mode = OPENDMARC_VDMARC_VERIFICATION_MODE_NONE;
 
 			return cur;
 		}
@@ -610,6 +641,15 @@ config_get(struct config *head, const char *name, void *value, size_t size)
 				conf_error = CONF_ILLEGAL;
 				return -1;
 
+			  case CONFIG_TYPE_VDMARC_MODE:
+				if (size != sizeof(OPENDMARC_VDMARC_VERIFICATION_MODE_T))
+				{
+					conf_error = CONF_ILLEGAL;
+					return -1;
+				}
+				memcpy(value, &cur->cfg_vdmarc_mode, size);
+				break;
+
 			  default:
 				if (size != sizeof(char *))
 				{
@@ -706,6 +746,26 @@ config_dump(struct config *cfg, FILE *out, const char *name)
 
 		  case CONFIG_TYPE_BOOLEAN:
 			fprintf(out, "%s\n", cur->cfg_bool ? "True" : "False");
+			break;
+
+		  case CONFIG_TYPE_VDMARC_MODE:
+			switch (cur->cfg_vdmarc_mode)
+			{
+			  case OPENDMARC_VDMARC_VERIFICATION_MODE_STRICT:
+				fprintf(out, "%s\n", VDMARC_VERIFICATION_MODE_STRICT_STRING);
+				break;
+
+			  case OPENDMARC_VDMARC_VERIFICATION_MODE_RELAX:
+				fprintf(out, "%s\n", VDMARC_VERIFICATION_MODE_RELAX_STRING);
+				break;
+
+			  case OPENDMARC_VDMARC_VERIFICATION_MODE_NONE:
+				fprintf(out, "%s\n", VDMARC_VERIFICATION_MODE_NONE_STRING);
+				break;
+
+			  default:
+				assert(0);
+			}
 			break;
 
 		  default:
