@@ -769,31 +769,51 @@ query_again2:
 		}
 	}
 dns_failed:
-	switch (dns_reply)
+	switch (vdmarc_mode)
 	{
-		case HOST_NOT_FOUND:
-		case NO_DATA:
-		case NO_RECOVERY:
-			switch (vdmarc_mode)
+		case OPENDMARC_VDMARC_VERIFICATION_MODE_STRICT:
+			switch (dns_reply)
 			{
-				case OPENDMARC_VDMARC_VERIFICATION_MODE_STRICT:
+				case HOST_NOT_FOUND:
+				case NO_DATA:
+				case NO_RECOVERY:
+				case TRY_AGAIN:
 					pctx->verified_virtually = TRUE;
 					return opendmarc_policy_parse_dmarc(pctx, domain, DMARC_DEFAULT_BESTGUESSPASS_RECORD_WITH_STRICT_MODE);
-
-				case OPENDMARC_VDMARC_VERIFICATION_MODE_RELAX:
-					pctx->verified_virtually = TRUE;
-					return opendmarc_policy_parse_dmarc(pctx, domain, DMARC_DEFAULT_BESTGUESSPASS_RECORD_WITH_RELAX_MODE);
-
-				case OPENDMARC_VDMARC_VERIFICATION_MODE_NONE:
+				case NETDB_INTERNAL:
+					return DMARC_DNS_ERROR_TMPERR;
+				default:
 					return DMARC_DNS_ERROR_NO_RECORD;
 			}
-
-		case TRY_AGAIN:
-		case NETDB_INTERNAL:
-			return DMARC_DNS_ERROR_TMPERR;
-		default:
-			return DMARC_DNS_ERROR_NO_RECORD;
-
+	    
+		case OPENDMARC_VDMARC_VERIFICATION_MODE_RELAX:
+			switch (dns_reply)
+			{
+				case HOST_NOT_FOUND:
+				case NO_DATA:
+				case NO_RECOVERY:
+				case TRY_AGAIN:
+					pctx->verified_virtually = TRUE;
+					return opendmarc_policy_parse_dmarc(pctx, domain, DMARC_DEFAULT_BESTGUESSPASS_RECORD_WITH_RELAX_MODE);
+				case NETDB_INTERNAL:
+					return DMARC_DNS_ERROR_TMPERR;
+				default:
+					return DMARC_DNS_ERROR_NO_RECORD;
+			}
+	    
+		case OPENDMARC_VDMARC_VERIFICATION_MODE_NONE:
+			switch (dns_reply)
+			{
+				case HOST_NOT_FOUND:
+				case NO_DATA:
+				case NO_RECOVERY:
+					return DMARC_DNS_ERROR_NO_RECORD;
+				case TRY_AGAIN:
+				case NETDB_INTERNAL:
+					return DMARC_DNS_ERROR_TMPERR;
+				default:
+					return DMARC_DNS_ERROR_NO_RECORD;
+			}
 	}
 got_record:
 	return opendmarc_policy_parse_dmarc(pctx, domain, buf);
